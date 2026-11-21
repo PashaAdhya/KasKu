@@ -1,0 +1,6 @@
+{
+  "name": "KasKu",
+  "description": "Aplikasi pencatat keuangan harian sederhana dengan laporan pengeluaran bulanan, tampilan neo-brutalism, mode gelap, serta login Google dan sinkronisasi cloud.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

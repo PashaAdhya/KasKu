@@ -1,0 +1,158 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core helpers
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidMonthKey(val) {
+      return val is string && val.matches('^[0-9]{4}-[0-9]{2}$');
+    }
+
+    // Validation helpers
+    function isValidTransaction(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 80 &&
+             data.amount is int && data.amount > 0 && data.amount <= 1000000000000 &&
+             data.type is string && data.type in ['EXPENSE', 'INCOME'] &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+             data.paymentMethod is string && data.paymentMethod in ['CASH', 'QRIS', 'TRANSFER', 'CARD'] &&
+             (!('note' in data) || (data.note is string && data.note.size() <= 250)) &&
+             data.dateEpochDay is int && data.dateEpochDay >= 0 && data.dateEpochDay <= 100000 &&
+             isValidMonthKey(data.monthKey) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidBudget(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             isValidMonthKey(data.monthKey) &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+             data.limitAmount is int && data.limitAmount > 0 && data.limitAmount <= 1000000000000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidRecurring(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 80 &&
+             data.amount is int && data.amount > 0 && data.amount <= 1000000000000 &&
+             data.type is string && data.type in ['EXPENSE', 'INCOME'] &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+             data.paymentMethod is string && data.paymentMethod in ['CASH', 'QRIS', 'TRANSFER', 'CARD'] &&
+             data.dueDay is int && data.dueDay >= 1 && data.dueDay <= 31 &&
+             (!('lastLoggedMonth' in data) || isValidMonthKey(data.lastLoggedMonth)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // 1. User transactions subcollection
+    match /users/{userId}/transactions/{txId} {
+      allow get: if isOwner(userId) && isValidId(txId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(txId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'title', 'amount', 'type', 'category',
+                         'paymentMethod', 'dateEpochDay', 'monthKey', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'title', 'amount', 'type', 'category',
+                         'paymentMethod', 'note', 'dateEpochDay', 'monthKey', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidTransaction(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(txId) &&
+                       isValidTransaction(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title', 'amount', 'type', 'category', 'paymentMethod',
+                         'note', 'dateEpochDay', 'monthKey', 'updatedAt'
+                       ]);
+
+      allow delete: if isOwner(userId) && isValidId(txId);
+    }
+
+    // 2. User monthly budgets subcollection
+    match /users/{userId}/budgets/{budgetId} {
+      allow get: if isOwner(userId) && isValidId(budgetId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(budgetId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'monthKey', 'category', 'limitAmount', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'monthKey', 'category', 'limitAmount', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidBudget(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(budgetId) &&
+                       isValidBudget(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'monthKey', 'category', 'limitAmount', 'updatedAt'
+                       ]);
+
+      allow delete: if isOwner(userId) && isValidId(budgetId);
+    }
+
+    // 3. User recurring templates subcollection
+    match /users/{userId}/recurring/{itemId} {
+      allow get: if isOwner(userId) && isValidId(itemId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(itemId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'title', 'amount', 'type', 'category',
+                         'paymentMethod', 'dueDay', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'title', 'amount', 'type', 'category',
+                         'paymentMethod', 'dueDay', 'lastLoggedMonth', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidRecurring(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(itemId) &&
+                       isValidRecurring(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title', 'amount', 'type', 'category', 'paymentMethod',
+                         'dueDay', 'lastLoggedMonth', 'updatedAt'
+                       ]);
+
+      allow delete: if isOwner(userId) && isValidId(itemId);
+    }
+  }
+}

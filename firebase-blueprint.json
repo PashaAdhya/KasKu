@@ -1,0 +1,194 @@
+{
+  "entities": {
+    "TransactionRecord": {
+      "title": "TransactionRecord",
+      "description": "A daily expense or income transaction belonging to an authenticated user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated owner UID."
+        },
+        "title": {
+          "type": "string",
+          "description": "Short transaction title (1-80 chars)."
+        },
+        "amount": {
+          "type": "integer",
+          "description": "Transaction amount in whole IDR (> 0)."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["EXPENSE", "INCOME"],
+          "description": "Whether the transaction is an expense or income."
+        },
+        "category": {
+          "type": "string",
+          "description": "Category identifier (1-40 chars)."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["CASH", "QRIS", "TRANSFER", "CARD"],
+          "description": "Payment method used for the transaction."
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional note (0-250 chars)."
+        },
+        "dateEpochDay": {
+          "type": "integer",
+          "description": "LocalDate epoch day for timezone-safe grouping."
+        },
+        "monthKey": {
+          "type": "string",
+          "description": "Month key in YYYY-MM format for monthly reports."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp written via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp written via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "amount",
+        "type",
+        "category",
+        "paymentMethod",
+        "dateEpochDay",
+        "monthKey",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CategoryBudget": {
+      "title": "CategoryBudget",
+      "description": "Monthly spending cap overall or per category.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated owner UID."
+        },
+        "monthKey": {
+          "type": "string",
+          "description": "Target month in YYYY-MM format."
+        },
+        "category": {
+          "type": "string",
+          "description": "OVERALL or category ID."
+        },
+        "limitAmount": {
+          "type": "integer",
+          "description": "Monthly spending limit in whole IDR (> 0)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp written via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp written via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "monthKey",
+        "category",
+        "limitAmount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "RecurringTemplate": {
+      "title": "RecurringTemplate",
+      "description": "Recurring bill or salary template for quick monthly logging.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated owner UID."
+        },
+        "title": {
+          "type": "string",
+          "description": "Template title (1-80 chars)."
+        },
+        "amount": {
+          "type": "integer",
+          "description": "Recurring amount in whole IDR (> 0)."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["EXPENSE", "INCOME"],
+          "description": "Transaction type."
+        },
+        "category": {
+          "type": "string",
+          "description": "Category ID."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["CASH", "QRIS", "TRANSFER", "CARD"],
+          "description": "Payment method."
+        },
+        "dueDay": {
+          "type": "integer",
+          "description": "Day of month (1-31)."
+        },
+        "lastLoggedMonth": {
+          "type": "string",
+          "description": "Last YYYY-MM month when logged."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp written via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp written via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "amount",
+        "type",
+        "category",
+        "paymentMethod",
+        "dueDay",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/transactions/{txId}": {
+      "schema": {
+        "$ref": "#/entities/TransactionRecord"
+      },
+      "description": "User-owned daily finance transactions."
+    },
+    "/users/{userId}/budgets/{budgetId}": {
+      "schema": {
+        "$ref": "#/entities/CategoryBudget"
+      },
+      "description": "User-owned monthly budget caps."
+    },
+    "/users/{userId}/recurring/{itemId}": {
+      "schema": {
+        "$ref": "#/entities/RecurringTemplate"
+      },
+      "description": "User-owned recurring bill and income templates."
+    }
+  }
+}
